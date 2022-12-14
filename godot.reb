@@ -334,7 +334,7 @@ sys/make-scheme [
 						SKIP 64 ;; Reserved space
 						files: UI32LE
 					]
-					? files
+					;? files
 					info: make map! files
 					loop files [
 						if 1000 > length? bin/buffer [
@@ -359,7 +359,7 @@ sys/make-scheme [
 		read:  func[port [port!] /local ctx query info num out][
 			unless port/state [open port]
 			ctx: port/state
-			? ctx
+			;? ctx
 			if any-string? query: select port/spec 'query [
 				return get-pck-file port query
 			]
@@ -393,7 +393,7 @@ sys/make-scheme [
 		length?: func[port /local ctx files ][
 			unless ctx: port/state [cause-error 'access 'not-open port/spec/ref]
 			files: ctx/files
-			? files
+			;? files
 			any [
 				all [integer? files files]
 				length? files
