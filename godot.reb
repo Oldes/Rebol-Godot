@@ -311,7 +311,7 @@ get-pck-file: func[
 sys/make-scheme [
 	name: 'gpck
 	actor: [
-		open: func [port [port!] /local path bin][
+		open: func [port [port!] /local path bin tmp][
 			if port/state [
 				cause-error 'access 'already-open port/spec/ref
 			]
@@ -322,8 +322,34 @@ sys/make-scheme [
 				info:    none
 			]
 			with port/state [
+				tmp: port/spec
 				try/except [
-					conn: open/read/seek join port/spec/path port/spec/target
+					;; when the source is in type: gpck://file.pck
+					;; than we must correct the path and the target,
+					;; because in such a case, the file.pck is recognized as host
+					path: as file! combine [
+						(select tmp 'host)
+						(select tmp 'path)
+					]
+					;; using extend so if there is no path yet, it is added
+					extend tmp 'path :path
+					;; in case there is no target (no path was used), use path value
+					;; and change the path to the current directory
+					unless select tmp 'target [
+						extend tmp 'target :path
+						tmp/path: what-dir
+					]
+					;; now use full path (dir+file)
+					path: append copy tmp/path tmp/target
+	
+					;? path
+					all [
+						;; handle a case when the source is a path to an app folder
+						'dir = exists? path
+						block? tmp: try [read path/Contents/Resources/*.pck]
+						path: rejoin [dirize path %Contents/Resources/ first tmp] 
+					]
+					conn: open/read/seek path
 					if #{47445043} <> read/part conn 4 [
 						cause-error 'access 'invalid-check port/spec/ref
 					]
@@ -350,6 +376,7 @@ sys/make-scheme [
 						]
 					]
 				][
+					sys/log/error 'GODOT system/state/last-error
 					cause-error 'access 'cannot-open reduce [port/spec/ref system/state/last-error/id]
 				]
 			]
@@ -484,13 +511,26 @@ register-codec [
 
 extract-gpck: function[
 	"Extract content of Godot's archive file"
-	gpck [file!] "Path to Godot's *.pck file"
+	gpck [file!] "Path to Godot's *.pck file (or *.app directory)"
 	/into        "Target directory"
-	 dir [file!] "If not specified, current directory is used"
+	 dir [file!] "If not specified, used is the directory when the source file is"
 ][
 	port: open join gpck:// gpck
-	target: any [dir %./]
-	unless exists? dir [make-dir/deep dir]
+	target: any [
+		dir
+		undirize append copy port/spec/path port/spec/target
+	]
+	if find [%.app %.pck] tmp: skip tail target -4 [ clear tmp ]
+	if all [
+		not into
+		exists? target
+		not empty? read target
+	][
+		sys/log/error 'GODOT ["Target directory already exists and is not empty!"]
+		sys/log/error 'GODOT as-red target
+		exit
+	]
+	;? target
 	foreach [path info] port/state/info [
 		;? path
 		sys/log/info 'GODOT ["Extracting:" path]

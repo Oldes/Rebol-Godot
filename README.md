@@ -5,5 +5,5 @@ Rebol's Godot codecs and a scheme
 
 ```rebol
 import %godot.reb
-extract-gpck/into %path/to/file.pck %target-dir/
+extract-gpck %path/to/file.pck
 ```
